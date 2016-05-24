@@ -1,0 +1,116 @@
+---
+title: "Predicting exercise quality from accelerometer data"
+author: "Sandeep Dutta"
+date: "May 22, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(caret)
+library(lattice)
+library(ggplot2)
+options(scipen=999, digits=3)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+In this project, accelerometer data collected during exercise activity is analyzed, a classification model is trained and used to predict the outcome of the activity. The data comes from this source: http://groupware.les.inf.puc-rio.br/har.  Training and testing datasets containing sensor data from different parts of the body in 6 participants are utilized.
+
+The goal is to build an appropriate prediction model from the training data and then predict on the test data.
+
+## Data
+
+The data sets are downloaded from the URL and read in using read.csv(). The missing values are replaced as "NA".
+
+```{r data_acquire,cache=TRUE}
+
+trngURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+tstURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+trngFile <- "trngData.csv"
+testFile <- "testData.csv"
+download.file(trngURL, trngFile)
+download.file(tstURL, testFile)
+## read the data. Interprete missing values in cell as also NA.
+training <- read.csv(trngFile, na.strings=c("NA",""," "))
+testing <- read.csv(testFile, na.strings=c("NA",""," "))
+dim(training)
+dim(testing)
+```
+There are 160 features in each dataset and the training dataset has 19622 observations. The outcome is "classe" which is a factor variable of 5 levels. The features contain max, min, avg, stdev, variance, skewness and kurtosis measures of individual sensor readings. As these are derived from the actual raw parameters, there are a lot of observations which are "NA".
+
+## Model Development
+
+Only the raw features from sensor measurements were considered to build the model, ignoring features which had any "NA" observation. This reduced the features to 60. Again, the first six columns contain timestamps and id. These were also removed for the final datasets for training and prediction.
+
+```{r data_recast}
+## Find any column that has NA in it
+a<-lapply(training, function(x) any(is.na(x)))
+## Create subsets of datasets with columns that dont have NA
+inTrain <- training[!unlist(a)]
+inTest <- testing[!unlist(a)]
+inTrain<-inTrain[,8:60]
+inTest<-inTest[,8:60]
+```
+
+## Cross Validation
+
+Cross-validation was used for model development with K-fold CV so as to make sure that the result is not biased by any one partition. The best result from the K is chosen. A small K can lead to more bias whereas a large K can result in a higher variance. So a value of 5 was chosen as a trade-off that also considered computational time, specially for the RF model.
+
+Initially three different algorithms(Random Forest, CART and Boosting(GBM)) were compared.
+
+```{r model_dev, cache=TRUE, messsage=FALSE}
+library(caret)
+library(lattice)
+library(ggplot2)
+set.seed(456)
+mod.rf<-train(classe~.,data=inTrain,method="rf",trControl=trainControl(method="cv",number=5))
+set.seed(456)
+mod.gbm<-train(classe~.,data=inTrain,method="gbm",trControl=trainControl(method="cv",number=5), verbose=F)
+set.seed(456)
+mod.cart<-train(classe~.,data=inTrain,method="rpart",trControl=trainControl(method="cv",number=5))
+```
+The accuracy results for the algorithms after the 5 fold cross validation is shown below.
+```{r acc_summary, cache=FALSE, message=FALSE}
+rf_accuracy <-max(mod.rf$results$Accuracy)*100
+cart_accuracy <-max(mod.cart$results$Accuracy)*100
+gbm_accuracy <-max(mod.gbm$results$Accuracy)*100
+name_mod<-c("Random Forest", "CART", "GBM")
+accuracy<-c(round(rf_accuracy,3),round(cart_accuracy,3),round(gbm_accuracy,3))
+OutofSampleError<-round(100.0-accuracy,3)
+summaryAcc<-cbind(name_mod, accuracy,OutofSampleError)
+summaryAcc
+```
+The Random Forest model provides the highest accuracy during the 5-fold cross-validation training of the data. The Out of Sample Error is calculated directly from the reported accuracy numbers from the K-fold cross validation. In each fold of the process, the out of sample error is determined by testing against the holdout set. In the end the best result is selected from all the folds.
+
+Here are more details of the Random Forest model which was chosen as the final prediction model.
+
+```{r rf_details, message=FALSE}
+mod.rf
+```
+The plot here shows the average accuracy for the K-fold CV against the number of randomly selected parameters that was determined for the model. The best accuracy is when 27 predictors were selected. This is clearlt shown below when we look at the bestTune parameter of the model.
+
+```{r plot_accuracy}
+plot.train(mod.rf, main="Model Accuracy vs Number of Selected Predictors")
+mod.rf$bestTune
+```
+
+Next the importance of the different predictors in the model are looked at. The top 15 predictors are shown in the figure below. roll_belt seems to have the most importance.
+```{r plot_varimp, message=FALSE, warning=FALSE}
+plot(varImp(mod.rf), top=10, main="Top 15 Predictors for the model")
+```
+
+## Predicting the test cases
+
+The selected random forest model is now used to predict the classe variable for the 20 test cases. The predicted values are shown below:
+
+```{r predict_test, message=FALSE}
+test_pred<-predict(mod.rf, newdata=inTest)
+test_results<-cbind(problem_id=inTest$problem_id, prediction=as.character(test_pred))
+test_results
+```
+
+## Conclusion
+
+A random forest model was used after comparing with other models and selecting the model with best accuracy on the training data with K-fold cross validation. 
+
