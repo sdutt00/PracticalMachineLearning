@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introduction
 
-In this report, accelerometer data collected during exercise activity is analyzed, trained and used to predict the outcome of the activity. The data comes from come this source: http://groupware.les.inf.puc-rio.br/har.  Training and testing datasets containing sensor data from different parts of the body in 6 participants are utilized.
+In this project, accelerometer data collected during exercise activity is analyzed, a classification model is trained and used to predict the outcome of the activity. The data comes from this source: http://groupware.les.inf.puc-rio.br/har.  Training and testing datasets containing sensor data from different parts of the body in 6 participants are utilized.
 
 The goal is to build an appropriate prediction model from the training data and then predict on the test data.
 
