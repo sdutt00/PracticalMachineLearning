@@ -110,5 +110,7 @@ test_results<-cbind(problem_id=inTest$problem_id, prediction=as.character(test_p
 test_results
 ```
 
+## Conclusion
 
+A random forest model was used after comparing with other models and selecting the model with best accuracy on the training data with K-fold cross validation. 
 
